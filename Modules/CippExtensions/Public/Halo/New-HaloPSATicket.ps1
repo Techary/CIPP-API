@@ -64,9 +64,9 @@ function New-HaloPSATicket {
       Write-LogMessage `
         -API 'HaloPSATicket' `
         -sev Error `
-        -message "Failed to update HaloPSA ticket $TicketId: $Message" `
+        -message "Failed to update HaloPSA ticket $($TicketId): $Message" `
         -LogData (Get-CippException -Exception $_)
-      return "Failed to update HaloPSA ticket $TicketId: $Message"
+      return "Failed to update HaloPSA ticket $($TicketId): $Message"
     }
   }
 
