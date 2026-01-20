@@ -9,6 +9,7 @@ function Send-CIPPAlert {
         $TenantFilter,
         $altEmail,
         $altWebhook,
+        $PSATicketId,
         $APIName = 'Send Alert',
         $Headers,
         $TableName,
@@ -171,6 +172,7 @@ function Send-CIPPAlert {
                         TenantId   = $TenantFilter
                         AlertText  = "$HTMLContent"
                         AlertTitle = "$($Title)"
+                        TicketId   = $PSATicketId
                     }
                     New-CippExtAlert -Alert $Alert
                     Write-LogMessage -API 'Webhook Alerts' -tenant $TenantFilter -message "Sent PSA alert $title" -sev info
