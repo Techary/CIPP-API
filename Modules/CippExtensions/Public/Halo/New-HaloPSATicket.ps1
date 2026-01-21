@@ -19,8 +19,8 @@ function New-HaloPSATicket {
 
     $Object = [PSCustomObject]@{
       ticket_id      = $TicketId
-      #outcome_id     = 7
-      hiddenfromuser = $true
+      outcome_id     = 7
+      #hiddenfromuser = $true
       note_html      = $Html
     }
 
