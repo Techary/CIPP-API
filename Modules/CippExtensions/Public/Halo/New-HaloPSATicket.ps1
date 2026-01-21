@@ -12,7 +12,6 @@ function New-HaloPSATicket {
   $Configuration = ((Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json).HaloPSA
   $TicketTable = Get-CIPPTable -TableName 'PSATickets'
   $Token = Get-HaloToken -configuration $Configuration
-  Write-LogMessage API 'HaloPSATicket' -sev Error -message "New-HaloPSATicket Received ticket ID $($TicketId) from Send-CippExtAlert" -LogData $($TicketId)
 
   # Helper to add a note to an existing ticket
   function Add-HaloTicketNote {
@@ -20,7 +19,7 @@ function New-HaloPSATicket {
 
     $Object = [PSCustomObject]@{
       ticket_id      = $TicketId
-      outcome_id     = 7
+      #outcome_id     = 7
       hiddenfromuser = $true
       note_html      = $Html
     }

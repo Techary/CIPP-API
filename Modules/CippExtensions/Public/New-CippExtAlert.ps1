@@ -25,7 +25,6 @@ function New-CippExtAlert {
                         -Description $Alert.AlertText `
                         -Client $mappedId `
                         -TicketId $Alert.TicketId
-                    Write-LogMessage API 'HaloPSATicket' -sev Error -message "Sending ticket ID $($Alert.TicketId) to New-HaloPSATicket" -LogData $($Alert.TicketId)
                 }
             }
             'Gradient' {
