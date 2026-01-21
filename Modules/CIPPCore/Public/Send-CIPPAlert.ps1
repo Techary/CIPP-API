@@ -175,6 +175,7 @@ function Send-CIPPAlert {
                         TicketId   = $PSATicketId
                     }
                     New-CippExtAlert -Alert $Alert
+                    Write-LogMessage API 'HaloPSATicket' -sev Error -message "Sending ticket ID $($PSATicketId) to Send-CippExtAlert" -LogData $($PSATicketId)
                     Write-LogMessage -API 'Webhook Alerts' -tenant $TenantFilter -message "Sent PSA alert $title" -sev info
                 } catch {
                     $ErrorMessage = Get-CippException -Exception $_
