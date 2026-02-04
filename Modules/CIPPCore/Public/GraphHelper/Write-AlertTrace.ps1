@@ -15,9 +15,9 @@ function Write-AlertTrace {
     $Row = Get-CIPPAzDataTableEntity @table -Filter "RowKey eq '$($tenantFilter)-$($cmdletName)' and PartitionKey eq '$PartitionKey'"
     try {
         $RowData = $Row.LogData
-        $Compare = Compare-Object $RowData (ConvertTo-Json -InputObject $data -Compress -Depth 10 | Out-String)
+        $Compare = Compare-Object $RowData (ConvertTo-Json -InputObject $data -Compress -Depth 10)
         if ($Compare) {
-            $LogData = ConvertTo-Json -InputObject $data -Compress -Depth 10 | Out-String
+            $LogData = ConvertTo-Json -InputObject $data -Compress -Depth 10
             $TableRow = @{
                 'PartitionKey' = $PartitionKey
                 'RowKey'       = "$($tenantFilter)-$($cmdletName)"
@@ -31,7 +31,7 @@ function Write-AlertTrace {
             return $data
         }
     } catch {
-        $LogData = ConvertTo-Json -InputObject $data -Compress -Depth 10 | Out-String
+        $LogData = ConvertTo-Json -InputObject $data -Compress -Depth 10
         $TableRow = @{
             'PartitionKey' = $PartitionKey
             'RowKey'       = "$($tenantFilter)-$($cmdletName)"
