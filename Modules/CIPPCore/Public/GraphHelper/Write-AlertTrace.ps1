@@ -1,48 +1,72 @@
 function Write-AlertTrace {
     <#
     .FUNCTIONALITY
-    Internal function. Pleases most of Write-AlertTrace for alerting purposes
+        Internal function.
+        Writes alert trace data to Azure Table Storage only when data changes.
     #>
+    [CmdletBinding()]
     param(
+        [Parameter(Mandatory)]
         $cmdletName,
+
+        [Parameter(Mandatory)]
         $data,
+
+        [Parameter(Mandatory)]
         $tenantFilter,
-        [string]$PartitionKey = (Get-Date -UFormat '%Y%m%d').ToString(),
+
+        [string]$PartitionKey = (Get-Date -UFormat '%Y%m%d'),
+
         [string]$AlertComment = $null
     )
+
+    # Get table reference
     $Table = Get-CIPPTable -tablename AlertLastRun
-    #Get current row and compare the $logData object. If it's the same, don't write it.
-    $Row = Get-CIPPAzDataTableEntity @table -Filter "RowKey eq '$($tenantFilter)-$($cmdletName)' and PartitionKey eq '$PartitionKey'"
+    $RowKey = "$tenantFilter-$cmdletName"
+
+    # Normalize alert data into a deterministic JSON string
     try {
-        $RowData = $Row.LogData
-        $Compare = Compare-Object $RowData (ConvertTo-Json -InputObject $data -Compress -Depth 10)
-        if ($Compare) {
-            $LogData = ConvertTo-Json -InputObject $data -Compress -Depth 10
-            $TableRow = @{
-                'PartitionKey' = $PartitionKey
-                'RowKey'       = "$($tenantFilter)-$($cmdletName)"
-                'CmdletName'   = "$cmdletName"
-                'Tenant'       = "$tenantFilter"
-                'LogData'      = [string]$LogData
-                'AlertComment' = [string]$AlertComment
-            }
-            $Table.Entity = $TableRow
-            Add-CIPPAzDataTableEntity @Table -Force | Out-Null
-            return $data
-        }
+        $NewLogData = ConvertTo-Json -InputObject $data -Depth 10 -Compress
     } catch {
-        $LogData = ConvertTo-Json -InputObject $data -Compress -Depth 10
-        $TableRow = @{
-            'PartitionKey' = $PartitionKey
-            'RowKey'       = "$($tenantFilter)-$($cmdletName)"
-            'CmdletName'   = "$cmdletName"
-            'Tenant'       = "$tenantFilter"
-            'LogData'      = [string]$LogData
-            'AlertComment' = [string]$AlertComment
-        }
-        $Table.Entity = $TableRow
-        Add-CIPPAzDataTableEntity @Table -Force | Out-Null
-        return $data
+        throw "Write-AlertTrace: Failed to serialize alert data to JSON: $($_.Exception.Message)"
     }
 
+    # Attempt to get existing row
+    try {
+        $ExistingRow = Get-CIPPAzDataTableEntity @Table `
+            -Filter "PartitionKey eq '$PartitionKey' and RowKey eq '$RowKey'"
+    } catch {
+        $ExistingRow = $null
+    }
+
+    # Extract old LogData safely
+    $OldLogData = $null
+    if ($ExistingRow -and $ExistingRow.PSObject.Properties.Name -contains 'LogData') {
+        $OldLogData = $ExistingRow.LogData
+    }
+
+    # If data has not changed, do nothing
+    if ($OldLogData -eq $NewLogData) {
+        return
+    }
+
+    # Build entity to write
+    $Entity = @{
+        PartitionKey = $PartitionKey
+        RowKey       = $RowKey
+        CmdletName   = $cmdletName
+        Tenant       = $tenantFilter
+        LogData      = $NewLogData
+    }
+
+    if ($AlertComment) {
+        $Entity.AlertComment = $AlertComment
+    }
+
+    # Write (upsert via Force)
+    $Table.Entity = $Entity
+    Add-CIPPAzDataTableEntity @Table -Force | Out-Null
+
+    # Return data to alert pipeline
+    return $data
 }
