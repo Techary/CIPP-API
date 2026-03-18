@@ -2,7 +2,7 @@ function Register-CIPPExtensionScheduledTasks {
     param(
         [switch]$Reschedule,
         [int64]$NextSync = (([datetime]::UtcNow.AddMinutes(30)) - (Get-Date '1/1/1970')).TotalSeconds,
-        [string[]]$Extensions = @('Hudu', 'NinjaOne', 'CustomData', 'ITGlue')
+        [string[]]$Extensions = @('Hudu', 'NinjaOne', 'CustomData')
     )
 
     # get extension configuration and mappings table
