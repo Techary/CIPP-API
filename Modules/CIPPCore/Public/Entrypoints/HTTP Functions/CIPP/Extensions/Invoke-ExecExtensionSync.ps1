@@ -84,10 +84,6 @@ Function Invoke-ExecExtensionSync {
             Register-CIPPExtensionScheduledTasks -Reschedule -Extensions 'Hudu'
             $Results = [pscustomobject]@{'Results' = 'Extension sync tasks have been rescheduled and will start within 15 minutes' }
         }
-        'ITGlue' {
-            Register-CIPPExtensionScheduledTasks -Reschedule -Extensions 'ITGlue'
-            $Results = [pscustomobject]@{'Results' = 'ITGlue extension sync tasks have been rescheduled and will start within 15 minutes' }
-        }
 
     }
 

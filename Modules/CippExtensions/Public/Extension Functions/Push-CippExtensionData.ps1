@@ -14,12 +14,6 @@ function Push-CippExtensionData {
                 Invoke-HuduExtensionSync -Configuration $Config -TenantFilter $TenantFilter
             }
         }
-        'ITGlue' {
-            if ($Config.ITGlue.Enabled) {
-                Write-Host 'Performing ITGlue Extension Sync...'
-                Invoke-ITGlueExtensionSync -Configuration $Config -TenantFilter $TenantFilter
-            }
-        }
         'CustomData' {
             Write-Host 'Perfoming Custom Data Extension Sync...'
             Invoke-CustomDataSync -TenantFilter $TenantFilter
