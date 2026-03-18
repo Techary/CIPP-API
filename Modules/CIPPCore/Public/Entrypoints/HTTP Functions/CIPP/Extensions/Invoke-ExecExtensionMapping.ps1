@@ -31,6 +31,12 @@ Function Invoke-ExecExtensionMapping {
       'HuduFields' {
         $Result = Get-HuduFieldMapping -CIPPMapping $Table
       }
+      'ITGlue' {
+        $Result = Get-ITGlueMapping -CIPPMapping $Table
+      }
+      'ITGlueFields' {
+        $Result = Get-ITGlueFieldMapping -CIPPMapping $Table
+      }
       'Sherweb' {
         $Result = Get-SherwebMapping -CIPPMapping $Table
       }
@@ -76,6 +82,14 @@ Function Invoke-ExecExtensionMapping {
           $Result = Set-ExtensionFieldMapping -CIPPMapping $Table -APIName $APIName -Request $Request -Extension 'Hudu'
           Register-CIPPExtensionScheduledTasks
         }
+        'ITGlue' {
+          $Result = Set-ITGlueMapping -CIPPMapping $Table -APIName $APIName -Request $Request
+          Register-CIPPExtensionScheduledTasks
+        }
+        'ITGlueFields' {
+          $Result = Set-ExtensionFieldMapping -CIPPMapping $Table -APIName $APIName -Request $Request -Extension 'ITGlue'
+          Register-CIPPExtensionScheduledTasks
+        }
       }
     }
     $StatusCode = [HttpStatusCode]::OK
@@ -112,6 +126,23 @@ Function Invoke-ExecExtensionMapping {
   catch {
     $ErrorMessage = Get-CippException -Exception $_
     $Result = "Mapping API failed. $($ErrorMessage.NormalizedError)"
+    Write-LogMessage -API $APIName -headers $Headers -message $Result -Sev 'Error' -LogData $ErrorMessage
+    $StatusCode = [HttpStatusCode]::InternalServerError
+  }
+
+  try {
+    if ($Request.Query.CreateCAType) {
+      switch ($Request.Query.CreateCAType) {
+        'ITGlue' {
+          $Result = New-ITGlueCAPolicyAssetType
+        }
+      }
+    }
+    $StatusCode = [HttpStatusCode]::OK
+  }
+  catch {
+    $ErrorMessage = Get-CippException -Exception $_
+    $Result = "Create CA Type API failed. $($ErrorMessage.NormalizedError)"
     Write-LogMessage -API $APIName -headers $Headers -message $Result -Sev 'Error' -LogData $ErrorMessage
     $StatusCode = [HttpStatusCode]::InternalServerError
   }
