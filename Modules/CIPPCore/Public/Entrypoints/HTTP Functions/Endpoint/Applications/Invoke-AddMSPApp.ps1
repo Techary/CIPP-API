@@ -41,7 +41,8 @@ function Invoke-AddMSPApp {
                 $uninstallCommandLine = 'powershell.exe -ExecutionPolicy Bypass .\uninstall.ps1'
             }
             'NCentral' {
-                $installCommandLine = "powershell.exe -ExecutionPolicy Bypass .\install.ps1 -InstallParam $($RMMApp.PackageName)"
+                Write-Host 'Processing N-Central installation'
+                $installCommandLine = "powershell.exe -ExecutionPolicy Bypass .\install.ps1 -ServerAddress $($InstallParams.ServerAddress) -ServerPort $($InstallParams.ServerPort) -CustomerID $($InstallParams.CustomerID."$($Tenant.customerId)") -CustomerName `"$($InstallParams.CustomerName."$($Tenant.customerId)")`" -RegistrationToken $($InstallParams.RegistrationToken."$($Tenant.customerId)")"
                 $uninstallCommandLine = 'powershell.exe -ExecutionPolicy Bypass .\uninstall.ps1'
             }
             'automate' {
