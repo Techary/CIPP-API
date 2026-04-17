@@ -43,7 +43,13 @@ function Invoke-CIPPStandardDisableExchangeOnlinePowerShell {
 
     try {
 
-        $AdminUsers = (New-GraphGetRequest -uri 'https://graph.microsoft.com/v1.0/roleManagement/directory/roleAssignments?$expand=principal' -tenantid $Tenant).principal.userPrincipalName
+        $RoleAssignments = New-GraphGetRequest -uri 'https://graph.microsoft.com/v1.0/roleManagement/directory/roleAssignments?$expand=principal' -tenantid $Tenant
+        $DirectAdminUPNs = ($RoleAssignments | Where-Object { $_.principal.'@odata.type' -eq '#microsoft.graph.user' }).principal.userPrincipalName
+        $AdminGroupIds = ($RoleAssignments | Where-Object { $_.principal.'@odata.type' -eq '#microsoft.graph.group' }).principal.id | Select-Object -Unique
+        $GroupMemberUPNs = foreach ($GroupId in $AdminGroupIds) {
+            (New-GraphGetRequest -uri "https://graph.microsoft.com/v1.0/groups/$GroupId/transitiveMembers/microsoft.graph.user?`$select=userPrincipalName" -tenantid $Tenant).userPrincipalName
+        }
+        $AdminUsers = @($DirectAdminUPNs) + @($GroupMemberUPNs) | Where-Object { $_ } | Select-Object -Unique
         $UsersWithPowerShell = New-ExoRequest -tenantid $Tenant -cmdlet 'Get-User' -Select 'userPrincipalName, identity, guid, remotePowerShellEnabled' | Where-Object { $_.RemotePowerShellEnabled -eq $true -and $_.userPrincipalName -notin $AdminUsers }
         $PowerShellEnabledCount = ($UsersWithPowerShell | Measure-Object).Count
         $StateIsCorrect = $PowerShellEnabledCount -eq 0
