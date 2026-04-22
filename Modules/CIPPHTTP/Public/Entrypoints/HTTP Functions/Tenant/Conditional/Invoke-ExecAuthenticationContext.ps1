@@ -14,6 +14,11 @@ function Invoke-ExecAuthenticationContext {
     $Action = $Request.Body.Action ?? $Request.Query.Action
     $Id = $Request.Body.id ?? $Request.Query.id
 
+    # Spec (https://learn.microsoft.com/en-us/graph/api/resources/authenticationcontextclassreference?view=graph-rest-1.0) says c1 > c25, Entra shows 1-199.
+    # I'm going to keep in line with the spec but if YOU want to expand, update all three in unison:
+    #   - this regex
+    #   - Invoke-ExecRoleAuthContext.ps1 (claimValue regex)
+    #   - CIPP/src/components/CippComponents/CippAddAuthContextDrawer.jsx (ALL_IDS constant)
     if (-not $Id -or $Id -notmatch '^c([1-9]|1[0-9]|2[0-5])$') {
         return [HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::BadRequest
