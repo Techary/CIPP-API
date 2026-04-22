@@ -7,7 +7,8 @@ function New-CIPPCATemplate {
         $Headers,
         $preloadedUsers,
         $preloadedGroups,
-        $preloadedLocations
+        $preloadedLocations,
+        $preloadedAuthContexts
     )
 
     $JSON = ([pscustomobject]$JSON) | ForEach-Object {
@@ -101,6 +102,30 @@ function New-CIPPCATemplate {
                 $match = $groups | Where-Object { $_.id -eq $originalID }
                 if ($match) { $match.displayName } else { $originalID }
             })
+    }
+
+    $AuthContexts = $null
+    if ($preloadedAuthContexts) {
+        $AuthContexts = $preloadedAuthContexts
+    } elseif ($JSON.conditions.applications.includeAuthenticationContextClassReferences) {
+        $AuthContexts = New-GraphGetRequest -uri 'https://graph.microsoft.com/beta/identity/conditionalAccess/authenticationContextClassReferences' -tenantid $TenantFilter
+    }
+
+    $AuthContextInfo = [system.collections.generic.list[object]]::new()
+    foreach ($ContextId in $JSON.conditions.applications.includeAuthenticationContextClassReferences) {
+        $contextMatch = $AuthContexts | Where-Object { $_.id -eq $ContextId }
+        if ($contextMatch) {
+            $null = $AuthContextInfo.Add([pscustomobject]@{
+                    id          = $contextMatch.id
+                    displayName = $contextMatch.displayName
+                    description = $contextMatch.description
+                    isAvailable = $contextMatch.isAvailable
+                })
+        }
+    }
+
+    if ($AuthContextInfo.Count -gt 0) {
+        $JSON | Add-Member -NotePropertyName 'AuthenticationContextInfo' -NotePropertyValue @($AuthContextInfo) -Force
     }
 
     foreach ($Location in $IncludeJSON) {

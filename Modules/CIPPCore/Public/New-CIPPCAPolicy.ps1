@@ -12,7 +12,9 @@ function New-CIPPCAPolicy {
         $APIName = 'Create CA Policy',
         $Headers,
         $PreloadedCAPolicies = $null,
-        $PreloadedLocations = $null
+        $PreloadedLocations = $null,
+        $CreateAuthContexts = $false,
+        $AuthContextMapping = $null
     )
 
     # Helper function to replace group display names with GUIDs
@@ -164,6 +166,19 @@ function New-CIPPCAPolicy {
             $ErrorMessage = Get-CippException -Exception $_
             Write-Information "Error fetching authentication strength policies: $($ErrorMessage | ConvertTo-Json -Depth 10 -Compress)"
             throw "Failed to fetch authentication strength policies: $($ErrorMessage.NormalizedError)"
+        }
+    }
+
+    # Get existing authentication contexts once if needed
+    $AllAuthContexts = $null
+    if ($JSONobj.conditions.applications.includeAuthenticationContextClassReferences) {
+        try {
+            Write-Information 'Fetching all authentication contexts...'
+            $AllAuthContexts = New-GraphGETRequest -uri 'https://graph.microsoft.com/beta/identity/conditionalAccess/authenticationContextClassReferences' -tenantid $TenantFilter -asApp $true
+        } catch {
+            $ErrorMessage = Get-CippException -Exception $_
+            Write-Information "Error fetching authentication contexts: $($ErrorMessage | ConvertTo-Json -Depth 10 -Compress)"
+            throw "Failed to fetch authentication contexts: $($ErrorMessage.NormalizedError)"
         }
     }
 
@@ -384,6 +399,74 @@ function New-CIPPCAPolicy {
                 throw "Failed to replace displayNames for conditional access rule $($JSONobj.displayName): $($ErrorMessage.NormalizedError)"
             }
         }
+    }
+    # Remap authentication context references by displayName
+    # (source tenant c1-c25 ids may refer to differently-named contexts in the target tenant)
+    if ($JSONobj.conditions.applications.includeAuthenticationContextClassReferences) {
+        $ContextIds = @($JSONobj.conditions.applications.includeAuthenticationContextClassReferences)
+        if ($ContextIds.Count -gt 0) {
+            $ContextMetadataLookup = @{}
+            foreach ($InfoEntry in $JSONobj.AuthenticationContextInfo) {
+                if ($InfoEntry.id) { $ContextMetadataLookup[$InfoEntry.id] = $InfoEntry }
+            }
+            if ($AuthContextMapping) {
+                foreach ($MappingProp in $AuthContextMapping.PSObject.Properties) {
+                    if (-not $ContextMetadataLookup.ContainsKey($MappingProp.Name)) {
+                        $ContextMetadataLookup[$MappingProp.Name] = $MappingProp.Value
+                    }
+                }
+            }
+
+            $UsedContextIds = [System.Collections.Generic.HashSet[string]]::new()
+            foreach ($Existing in $AllAuthContexts) { $null = $UsedContextIds.Add($Existing.id) }
+
+            $NewContextIds = [System.Collections.Generic.List[string]]::new()
+            foreach ($SourceId in $ContextIds) {
+                $Metadata = $ContextMetadataLookup[$SourceId]
+                if (-not $Metadata -or -not $Metadata.displayName) {
+                    Write-Information "No metadata available for authentication context '$SourceId'; leaving id unchanged."
+                    $null = $NewContextIds.Add($SourceId)
+                    continue
+                }
+
+                $TargetContext = @($AllAuthContexts | Where-Object { $_.displayName -eq $Metadata.displayName }) | Select-Object -First 1
+                if ($TargetContext) {
+                    Write-Information "Matched authentication context '$($Metadata.displayName)' to $($TargetContext.id) in target tenant"
+                    $null = $NewContextIds.Add($TargetContext.id)
+                    continue
+                }
+
+                if (-not $CreateAuthContexts) {
+                    throw "Authentication context '$($Metadata.displayName)' (template id $SourceId) does not exist in tenant $TenantFilter. Enable 'Create authentication contexts if they do not exist' or create it manually before deploying this policy."
+                }
+
+                $FreeSlot = 1..25 | ForEach-Object { "c$_" } | Where-Object { -not $UsedContextIds.Contains($_) } | Select-Object -First 1
+                if (-not $FreeSlot) {
+                    throw "Cannot create authentication context '$($Metadata.displayName)': all c1-c25 slots are in use in tenant $TenantFilter."
+                }
+
+                $CreateBody = [pscustomobject]@{
+                    id          = $FreeSlot
+                    displayName = $Metadata.displayName
+                    description = $Metadata.description
+                    isAvailable = if ($null -ne $Metadata.isAvailable) { [System.Convert]::ToBoolean($Metadata.isAvailable) } else { $true }
+                } | ConvertTo-Json
+                try {
+                    $null = New-GraphPOSTRequest -uri "https://graph.microsoft.com/beta/identity/conditionalAccess/authenticationContextClassReferences/$FreeSlot" -body $CreateBody -Type PATCH -tenantid $TenantFilter -asApp $true -ScheduleRetry $true
+                    Write-LogMessage -Headers $Headers -API $APIName -tenant $TenantFilter -message "Created authentication context '$($Metadata.displayName)' with id $FreeSlot" -Sev 'Info'
+                    $null = $UsedContextIds.Add($FreeSlot)
+                    $null = $NewContextIds.Add($FreeSlot)
+                } catch {
+                    $ErrorMessage = Get-CippException -Exception $_
+                    throw "Failed to create authentication context '$($Metadata.displayName)': $($ErrorMessage.NormalizedError)"
+                }
+            }
+
+            $JSONobj.conditions.applications.includeAuthenticationContextClassReferences = @($NewContextIds)
+        }
+    }
+    if ($JSONobj.PSObject.Properties.Name -contains 'AuthenticationContextInfo') {
+        $JSONobj.PSObject.Properties.Remove('AuthenticationContextInfo')
     }
     $JSONobj.PSObject.Properties.Remove('LocationInfo')
     foreach ($condition in $JSONobj.conditions.users.PSObject.Properties.Name) {
