@@ -43,7 +43,23 @@ function Invoke-CIPPStandardDisableExchangeOnlinePowerShell {
 
     try {
 
-        $AdminUsers = (New-GraphGetRequest -uri 'https://graph.microsoft.com/v1.0/roleManagement/directory/roleAssignments?$expand=principal' -tenantid $Tenant).principal.userPrincipalName
+        $RoleAssignments = New-GraphGetRequest -uri 'https://graph.microsoft.com/v1.0/roleManagement/directory/roleAssignments?$expand=principal' -tenantid $Tenant
+        $DirectAdminUPNs = ($RoleAssignments | Where-Object { $_.principal.'@odata.type' -eq '#microsoft.graph.user' }).principal.userPrincipalName
+        $AdminGroupIds = ($RoleAssignments | Where-Object { $_.principal.'@odata.type' -eq '#microsoft.graph.group' }).principal.id | Select-Object -Unique
+
+        $GroupMemberUPNs = if ($AdminGroupIds) {
+            $BulkRequests = foreach ($GroupId in $AdminGroupIds) {
+                @{
+                    id     = $GroupId
+                    method = 'GET'
+                    url    = "groups/$GroupId/transitiveMembers/microsoft.graph.user?`$select=userPrincipalName"
+                }
+            }
+            $BulkResults = New-GraphBulkRequest -tenantid $Tenant -Requests @($BulkRequests) -Version 'v1.0'
+            $BulkResults.body.value.userPrincipalName
+        }
+
+        $AdminUsers = @($DirectAdminUPNs) + @($GroupMemberUPNs) | Where-Object { $_ } | Select-Object -Unique
         $UsersWithPowerShell = New-ExoRequest -tenantid $Tenant -cmdlet 'Get-User' -Select 'userPrincipalName, identity, guid, remotePowerShellEnabled' | Where-Object { $_.RemotePowerShellEnabled -eq $true -and $_.userPrincipalName -notin $AdminUsers }
         $PowerShellEnabledCount = ($UsersWithPowerShell | Measure-Object).Count
         $StateIsCorrect = $PowerShellEnabledCount -eq 0
@@ -67,15 +83,12 @@ function Invoke-CIPPStandardDisableExchangeOnlinePowerShell {
             }
 
             $BatchResults = New-ExoBulkRequest -tenantid $tenant -cmdletArray @($Request)
-            $SuccessCount = 0
-            foreach ($Result in $BatchResults) {
-                if ($Result.error) {
-                    $ErrorMessage = Get-NormalizedError -Message $Result.error
-                    Write-LogMessage -API 'Standards' -tenant $Tenant -message "Failed to disable Exchange Online PowerShell for $($Result.target). Error: $ErrorMessage" -sev Error
-                } else {
-                    $SuccessCount++
-                }
+            $ErrorResults = @($BatchResults | Where-Object { $_.error })
+            foreach ($Result in $ErrorResults) {
+                $ErrorMessage = Get-NormalizedError -Message $Result.error
+                Write-LogMessage -API 'Standards' -tenant $Tenant -message "Failed to disable Exchange Online PowerShell for $($Result.target). Error: $ErrorMessage" -sev Error
             }
+            $SuccessCount = $PowerShellEnabledCount - $ErrorResults.Count
 
             Write-LogMessage -API 'Standards' -tenant $Tenant -message "Successfully disabled Exchange Online PowerShell for $SuccessCount out of $PowerShellEnabledCount users." -sev Info
         } else {
