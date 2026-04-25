@@ -32,7 +32,7 @@ function Set-CIPPMailboxRule {
                 Enabled = $EnabledValue
             }
         } catch {
-            Write-LogMessage -headers $Headers -API $APIName -message "Rule updated but failed to update cache: $($_.Exception.Message)" -sev 'Warn' -tenant $TenantFilter
+            Write-LogMessage -headers $Headers -API $APIName -message "Rule updated but failed to update cache: $($_.Exception.Message)" -sev 'Warning' -tenant $TenantFilter
         }
 
         return "Successfully set mailbox rule $($RuleName) for $($Username) to $($State)d"
