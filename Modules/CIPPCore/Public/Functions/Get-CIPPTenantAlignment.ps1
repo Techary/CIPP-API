@@ -380,15 +380,45 @@ function Get-CIPPTenantAlignment {
 
                 foreach ($item in $ComparisonResults) {
                     $IsAcceptedDeviation = $false
+                    $DeviationStatus = $null
                     if ($IsDriftTemplate -and $item.ComplianceStatus -eq 'Non-Compliant') {
                         $DeviationStatus = $TenantDriftStatuses[$item.StandardName]
                         $IsAcceptedDeviation = $DeviationStatus -in @('Accepted', 'CustomerSpecific')
                     }
 
-                    if ($item.ComplianceStatus -eq 'Compliant' -or $IsAcceptedDeviation) { $CompliantStandards++ }
+                    # Update the item's compliance status and add deviation info for granular consumers
+                    if ($IsAcceptedDeviation) {
+                        $item.ComplianceStatus = if ($DeviationStatus -eq 'Accepted') { 'Accepted Deviation' } else { 'Customer Specific' }
+                    }
+                    if ($DeviationStatus) {
+                        $item | Add-Member -NotePropertyName 'DeviationStatus' -NotePropertyValue $DeviationStatus -Force
+                    }
+
+                    if ($item.ComplianceStatus -in @('Compliant', 'Accepted Deviation', 'Customer Specific')) { $CompliantStandards++ }
                     elseif ($item.ComplianceStatus -eq 'Non-Compliant') { $NonCompliantStandards++ }
                     elseif ($item.ComplianceStatus -eq 'License Missing') { $LicenseMissingStandards++ }
                     if ($item.ReportingDisabled) { $ReportingDisabledStandardsCount++ }
+                }
+
+                # For drift templates, include all policy deviation entries from tenantDrift table in alignment score
+                # Accepted/CustomerSpecific count as compliant, all others (New, Denied, etc.) count as non-compliant
+                $CurrentDeviationsCount = $null
+                if ($IsDriftTemplate) {
+                    $PolicyDeviationCompliant = 0
+                    $PolicyDeviationNonCompliant = 0
+                    foreach ($DriftKey in $TenantDriftStatuses.Keys) {
+                        if ($DriftKey -like 'IntuneTemplates.*' -or $DriftKey -like 'ConditionalAccessTemplates.*') {
+                            if ($TenantDriftStatuses[$DriftKey] -in @('Accepted', 'CustomerSpecific')) {
+                                $PolicyDeviationCompliant++
+                            } else {
+                                $PolicyDeviationNonCompliant++
+                            }
+                        }
+                    }
+                    $AllCount += $PolicyDeviationCompliant + $PolicyDeviationNonCompliant
+                    $CompliantStandards += $PolicyDeviationCompliant
+                    $NonCompliantStandards += $PolicyDeviationNonCompliant
+                    $CurrentDeviationsCount = $PolicyDeviationNonCompliant
                 }
 
                 $AlignmentPercentage = if (($AllCount - $ReportingDisabledStandardsCount) -gt 0) {
@@ -420,6 +450,7 @@ function Get-CIPPTenantAlignment {
                     LicenseMissingStandards  = $LicenseMissingStandards
                     TotalStandards           = $AllCount
                     ReportingDisabledCount   = $ReportingDisabledStandardsCount
+                    CurrentDeviationsCount   = $CurrentDeviationsCount
                     LatestDataCollection     = if ($LatestDataCollection) { $LatestDataCollection } else { $null }
                     ComparisonDetails        = $ComparisonResults
                 }
