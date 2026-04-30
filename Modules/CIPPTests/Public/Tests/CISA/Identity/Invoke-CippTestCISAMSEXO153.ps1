@@ -16,10 +16,10 @@ function Invoke-CippTestCISAMSEXO153 {
     )
 
     try {
-        $SafeLinksPolicies = Get-CIPPTestData -TenantFilter $Tenant -Type 'ExoSafeLinksPolicies'
+        $SafeLinksPolicies = New-CIPPDbRequest -TenantFilter $Tenant -Type 'ExoSafeLinksPolicy'
 
         if (-not $SafeLinksPolicies) {
-            Add-CippTestResult -Status 'Skipped' -ResultMarkdown 'ExoSafeLinksPolicies cache not found. Please refresh the cache for this tenant.' -Risk 'Medium' -Name 'User click tracking SHOULD be disabled' -UserImpact 'Low' -ImplementationEffort 'Low' -Category 'Email Protection' -TestId 'CISAMSEXO153' -TenantFilter $Tenant
+            Add-CippTestResult -Status 'Skipped' -ResultMarkdown 'ExoSafeLinksPolicy cache not found. Please refresh the cache for this tenant.' -Risk 'Medium' -Name 'User click tracking SHOULD be disabled' -UserImpact 'Low' -ImplementationEffort 'Low' -Category 'Email Protection' -TestId 'CISAMSEXO153' -TenantFilter $Tenant
             return
         }
 

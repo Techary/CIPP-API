@@ -38,7 +38,7 @@ function Push-ExecCIPPDBCache {
 
         # Single-type mode (legacy) — used by HTTP endpoint for on-demand cache refresh
         $Name = $Item.Name
-        $Types = @($Item.Types | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and $_ -ne 'None' })
+        $Types = $Item.Types
 
         Write-Information "Collecting $Name for tenant $TenantFilter"
 
@@ -62,8 +62,7 @@ function Push-ExecCIPPDBCache {
         }
 
         # Add Types if provided (for Mailboxes function)
-        $FunctionSupportsTypes = $Function.Parameters.ContainsKey('Types')
-        if ($Types.Count -gt 0 -and $FunctionSupportsTypes) {
+        if ($Types) {
             $CacheFunctionParams.Types = $Types
         }
 

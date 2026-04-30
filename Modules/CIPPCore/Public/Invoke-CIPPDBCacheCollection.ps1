@@ -80,6 +80,10 @@ function Invoke-CIPPDBCacheCollection {
             'ExoAcceptedDomains'
             'ExoHostedContentFilterPolicy'
             'ExoHostedOutboundSpamFilterPolicy'
+            'ExoAntiPhishPolicy'
+            'ExoSafeLinksPolicy'
+            'ExoSafeAttachmentPolicy'
+            'ExoMalwareFilterPolicy'
             'ExoAtpPolicyForO365'
             'ExoQuarantinePolicy'
             'ExoRemoteDomain'
@@ -91,10 +95,7 @@ function Invoke-CIPPDBCacheCollection {
         ExchangeData       = @(
             'CASMailboxes'
             'MailboxUsage'
-            'OneDriveSiteListing'
             'OneDriveUsage'
-            'SharePointSiteListing'
-            'SharePointSiteUsage'
             'OfficeActivations'
         )
         ConditionalAccess  = @(

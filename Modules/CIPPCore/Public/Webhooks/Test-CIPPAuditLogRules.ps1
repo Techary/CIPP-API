@@ -149,13 +149,12 @@ function Test-CIPPAuditLogRules {
             # Check if the TenantFilter matches any tenant in the expanded list or AllTenants
             if ($ExpandedTenants.value -contains $TenantFilter -or $ExpandedTenants.value -contains 'AllTenants') {
                 [pscustomobject]@{
-                    Tenants       = $Tenants
-                    Excluded      = ($ConfigEntry.excludedTenants | ConvertFrom-Json -ErrorAction SilentlyContinue)
-                    Conditions    = $ConfigEntry.Conditions
-                    Actions       = $ConfigEntry.Actions
-                    LogType       = $ConfigEntry.Type
-                    AlertComment  = $ConfigEntry.AlertComment
-                    CustomSubject = $ConfigEntry.CustomSubject
+                    Tenants      = $Tenants
+                    Excluded     = ($ConfigEntry.excludedTenants | ConvertFrom-Json -ErrorAction SilentlyContinue)
+                    Conditions   = $ConfigEntry.Conditions
+                    Actions      = $ConfigEntry.Actions
+                    LogType      = $ConfigEntry.Type
+                    AlertComment = $ConfigEntry.AlertComment
                 }
             }
         }
@@ -586,7 +585,6 @@ function Test-CIPPAuditLogRules {
                         expectedAction   = $actions
                         CIPPClause       = $CIPPClause
                         AlertComment     = $Config.AlertComment
-                        CustomSubject    = $Config.CustomSubject
                         HasGeoCondition  = $HasGeoCondition
                         ExcludedUserKeys = $LocationExcludedUserKeys
                     }
@@ -648,7 +646,6 @@ function Test-CIPPAuditLogRules {
                             $item.CIPPAction = $clause.expectedAction
                             $item.CIPPClause = $clause.CIPPClause -join ' and '
                             $item | Add-Member -NotePropertyName 'CIPPAlertComment' -NotePropertyValue $clause.AlertComment -Force -ErrorAction SilentlyContinue
-                            $item | Add-Member -NotePropertyName 'CIPPCustomSubject' -NotePropertyValue $clause.CustomSubject -Force -ErrorAction SilentlyContinue
                             $MatchedRules.Add($clause.CIPPClause -join ' and ')
                             $item
                         }

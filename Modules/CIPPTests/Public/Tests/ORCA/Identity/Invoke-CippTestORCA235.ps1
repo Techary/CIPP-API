@@ -6,7 +6,7 @@ function Invoke-CippTestORCA235 {
     param($Tenant)
 
     try {
-        $AcceptedDomains = Get-CIPPTestData -TenantFilter $Tenant -Type 'ExoAcceptedDomains'
+        $AcceptedDomains = New-CIPPDbRequest -TenantFilter $Tenant -Type 'ExoAcceptedDomains'
 
         if (-not $AcceptedDomains) {
             Add-CippTestResult -TenantFilter $Tenant -TestId 'ORCA235' -TestType 'Identity' -Status 'Skipped' -ResultMarkdown 'No accepted domains found in database.' -Risk 'High' -Name 'SPF records setup for custom domains' -UserImpact 'High' -ImplementationEffort 'Medium' -Category 'Configuration'

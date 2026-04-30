@@ -57,9 +57,9 @@ function Push-GetMailboxPermissionsBatch {
         # Normalize MailboxPermission results
         if ($MailboxPermissions['Get-MailboxPermission']) {
             $NormalizedMailboxPerms = foreach ($Perm in $MailboxPermissions['Get-MailboxPermission']) {
-                $AccessStr = if ($Perm.AccessRights -is [array]) { $Perm.AccessRights -join ',' } else { $Perm.AccessRights }
+                # Create normalized object with consistent property names and unique ID
                 [PSCustomObject]@{
-                    id           = "MBP-$($Perm.Identity)-$($Perm.User)-$AccessStr"
+                    id           = [guid]::NewGuid().ToString()
                     Identity     = $Perm.Identity
                     User         = $Perm.User
                     AccessRights = $Perm.AccessRights
@@ -73,12 +73,11 @@ function Push-GetMailboxPermissionsBatch {
         # Normalize the results - RecipientPermission uses 'Trustee' instead of 'User'
         if ($MailboxPermissions['Get-RecipientPermission']) {
             $NormalizedRecipientPerms = foreach ($Perm in $MailboxPermissions['Get-RecipientPermission']) {
-                $UserVal = if ($Perm.Trustee) { $Perm.Trustee } else { $Perm.User }
-                $AccessStr = if ($Perm.AccessRights -is [array]) { $Perm.AccessRights -join ',' } else { $Perm.AccessRights }
+                # Create normalized object with consistent property names and unique ID
                 [PSCustomObject]@{
-                    id           = "RCP-$($Perm.Identity)-$UserVal-$AccessStr"
+                    id           = [guid]::NewGuid().ToString()
                     Identity     = $Perm.Identity
-                    User         = $UserVal
+                    User         = if ($Perm.Trustee) { $Perm.Trustee } else { $Perm.User }
                     AccessRights = $Perm.AccessRights
                     IsInherited  = $Perm.IsInherited
                     Deny         = $Perm.Deny
@@ -95,11 +94,10 @@ function Push-GetMailboxPermissionsBatch {
         # Normalize SendOnBehalf permissions from passed mailbox metadata
         $NormalizedSendOnBehalfPerms = foreach ($Mailbox in ($MailboxData | Where-Object { $_.GrantSendOnBehalfTo -and ($Mailboxes -contains $_.UPN) })) {
             foreach ($Delegate in (@($Mailbox.GrantSendOnBehalfTo) | Where-Object { $_ -and $MailboxIdentityLookup.ContainsKey([string]$_) })) {
-                $DelegateUPN = $MailboxIdentityLookup[[string]$Delegate]
                 [PSCustomObject]@{
-                    id           = "SOB-$($Mailbox.UPN)-$DelegateUPN"
+                    id           = [guid]::NewGuid().ToString()
                     Identity     = $Mailbox.UPN
-                    User         = $DelegateUPN
+                    User         = $MailboxIdentityLookup[[string]$Delegate]
                     AccessRights = @('SendOnBehalf')
                     IsInherited  = $false
                     Deny         = $false

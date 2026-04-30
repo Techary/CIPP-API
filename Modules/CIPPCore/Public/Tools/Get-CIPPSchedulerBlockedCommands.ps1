@@ -19,10 +19,6 @@ function Get-CIPPSchedulerBlockedCommands {
         'Get-CIPPAuthentication'
         'New-CIPPAzServiceSAS'
 
-        # Az Functions cmdlet
-        'Get-CIPPAzFunctionAppSetting'
-        'Update-CIPPAzFunctionAppSetting'
-
         # Extension authentication tokens
         'Get-GradientToken'
         'Get-HaloToken'

@@ -19,10 +19,6 @@ function Get-CIPPMDEOnboardingReport {
             $TenantList = Get-Tenants -IncludeErrors
             $Tenants = $Tenants | Where-Object { $TenantList.defaultDomainName -contains $_ }
 
-            if (-not $Tenants) {
-                throw 'No MDE onboarding data found in reporting database for any tenant. Sync the report data first.'
-            }
-
             $AllResults = [System.Collections.Generic.List[PSCustomObject]]::new()
             foreach ($Tenant in $Tenants) {
                 try {

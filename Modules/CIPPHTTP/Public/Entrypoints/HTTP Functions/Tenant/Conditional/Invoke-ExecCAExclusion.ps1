@@ -35,30 +35,21 @@ function Invoke-ExecCAExclusion {
             throw "Policy with ID $PolicyId not found in tenant $TenantFilter."
         }
 
-        $VacationGroupName = "Vacation Exclusion - $($Policy.displayName)"
-        $escapedGroupName = $VacationGroupName -replace "'", "''"
-        $groupFilter = "displayName eq '$escapedGroupName' and mailEnabled eq false and securityEnabled eq true"
-        $encodedGroupFilter = [System.Uri]::EscapeDataString($groupFilter)
-        $VacationGroups = @(New-GraphGetRequest -uri "https://graph.microsoft.com/beta/groups?`$select=id,displayName&`$filter=$encodedGroupFilter" -tenantid $TenantFilter)
+        $SecurityGroups = New-GraphGetRequest -uri "https://graph.microsoft.com/beta/groups?`$select=id,displayName&`$filter=securityEnabled eq true and mailEnabled eq false&`$count=true" -tenantid $TenantFilter
+        $VacationGroup = $SecurityGroups | Where-Object { $_.displayName -contains "Vacation Exclusion - $($Policy.displayName)" }
 
-        $DuplicateGroupWarning = $null
-        if ($VacationGroups.Count -eq 0) {
-            Write-Information "Creating vacation group: $VacationGroupName"
+        if (!$VacationGroup) {
+            Write-Information "Creating vacation group: Vacation Exclusion - $($Policy.displayName)"
             $Guid = [guid]::NewGuid().ToString()
             $GroupObject = @{
                 groupType       = 'generic'
-                displayName     = $VacationGroupName
+                displayName     = "Vacation Exclusion - $($Policy.displayName)"
                 username        = "vacation$Guid"
                 securityEnabled = $true
             }
             $NewGroup = New-CIPPGroup -GroupObject $GroupObject -TenantFilter $TenantFilter -APIName 'Invoke-ExecCAExclusion'
             $GroupId = $NewGroup.GroupId
         } else {
-            $VacationGroup = $VacationGroups | Select-Object -First 1
-            if ($VacationGroups.Count -gt 1) {
-                $DuplicateGroupWarning = "Failed to find a unique vacation group for policy '$($Policy.displayName)'. Multiple groups found, using group $($VacationGroup.id)."
-                Write-Warning "Multiple vacation groups found for policy '$($Policy.displayName)'. Using group $($VacationGroup.id)."
-            }
             Write-Information "Using existing vacation group: $($VacationGroup.displayName)"
             $GroupId = $VacationGroup.id
         }
@@ -132,11 +123,7 @@ function Invoke-ExecCAExclusion {
                 }
                 Add-CIPPScheduledTask -Task $AuditRemoveTask -hidden $true
             }
-            $Results = @("Successfully added vacation mode schedule for $Username on policy '$PolicyName'.")
-            if ($DuplicateGroupWarning) {
-                $Results += $DuplicateGroupWarning
-            }
-            $body = @{ Results = $Results }
+            $body = @{ Results = "Successfully added vacation mode schedule for $Username." }
         } else {
             $Parameters = @{
                 ExclusionType = $ExclusionType
@@ -153,12 +140,7 @@ function Invoke-ExecCAExclusion {
     } catch {
         Write-Warning "Failed to perform exclusion for $Username : $($_.Exception.Message)"
         Write-Information $_.InvocationInfo.PositionMessage
-        $PolicyLabel = if ($PolicyName) { " on policy '$PolicyName'" } else { '' }
-        $Results = @("Failed to perform exclusion for $Username${PolicyLabel}: $($_.Exception.Message)")
-        if ($DuplicateGroupWarning) {
-            $Results += $DuplicateGroupWarning
-        }
-        $body = @{ Results = $Results }
+        $body = @{ Results = "Failed to perform exclusion for $Username : $($_.Exception.Message)" }
         Write-LogMessage -headers $Headers -API 'Invoke-ExecCAExclusion' -message "Failed to perform exclusion for $Username : $_" -Sev 'Error' -tenant $TenantFilter -LogData (Get-CippException -Exception $_)
     }
 

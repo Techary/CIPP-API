@@ -18,7 +18,7 @@ function Invoke-CippTestZTNA21889 {
     #tested
     try {
         # Get authentication methods policy from cache
-        $AuthMethodsPolicy = Get-CIPPTestData -TenantFilter $Tenant -Type 'AuthenticationMethodsPolicy'
+        $AuthMethodsPolicy = New-CIPPDbRequest -TenantFilter $Tenant -Type 'AuthenticationMethodsPolicy'
 
         if (-not $AuthMethodsPolicy) {
             $TestParams = @{

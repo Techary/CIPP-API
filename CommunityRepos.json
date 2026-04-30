@@ -1,7 +1,6 @@
 [
   {
     "Id": "1041442982",
-    "BuiltIn": true,
     "Name": "CISTemplates",
     "Description": "CIPP CIS Templates",
     "URL": "https://github.com/CyberDrain/CyberDrain-CIS-Templates",
@@ -20,7 +19,6 @@
   },
   {
     "Id": "930523724",
-    "BuiltIn": true,
     "Name": "CIPP-Templates",
     "Description": "CIPP Community Templates",
     "URL": "https://github.com/CyberDrain/CIPP-Templates",
@@ -39,7 +37,6 @@
   },
   {
     "Id": "784230225",
-    "BuiltIn": true,
     "Name": "ConditionalAccessBaseline",
     "Description": "",
     "URL": "https://github.com/j0eyv/ConditionalAccessBaseline",
@@ -58,7 +55,6 @@
   },
   {
     "Id": "493403016",
-    "BuiltIn": true,
     "Name": "OpenIntuneBaseline",
     "Description": "Community-driven baseline to accelerate Intune adoption and learning.",
     "URL": "https://github.com/SkipToTheEndpoint/OpenIntuneBaseline",
@@ -77,7 +73,6 @@
   },
   {
     "Id": "863076113",
-    "BuiltIn": true,
     "Name": "IntuneBaseLines",
     "Description": "In this repo, you will find Intune profiles in JSON format, which can be used in setting up your Modern Workplace. All policies were created in Microsoft Intune and exported to share with the community.",
     "URL": "https://github.com/IntuneAdmin/IntuneBaselines",

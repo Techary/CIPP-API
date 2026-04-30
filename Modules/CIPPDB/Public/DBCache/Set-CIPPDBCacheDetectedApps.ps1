@@ -19,58 +19,25 @@ function Set-CIPPDBCacheDetectedApps {
     try {
         Write-LogMessage -API 'CIPPDBCache' -tenant $TenantFilter -message 'Caching detected apps' -sev Debug
 
-        # Step 1: Get first page with noPaginate to avoid sequential chase, and read @odata.count
-        $FirstPageResult = New-GraphBulkRequest -Requests @(
-            [PSCustomObject]@{
-                id     = 'detectedApps-0'
-                method = 'GET'
-                url    = 'deviceManagement/detectedApps'
-            }
-        ) -tenantid $TenantFilter -NoPaginateIds @('detectedApps-0')
+        # Fetch all detected apps for the tenant
+        $DetectedApps = New-GraphGetRequest -uri 'https://graph.microsoft.com/beta/deviceManagement/detectedApps' -tenantid $TenantFilter
+        if (!$DetectedApps) { $DetectedApps = @() }
 
-        $FirstResponse = ($FirstPageResult | Where-Object { $_.id -eq 'detectedApps-0' }).body
-        $TotalCount = $FirstResponse.'@odata.count'
-        $DetectedApps = [System.Collections.Generic.List[PSCustomObject]]::new()
-        foreach ($app in $FirstResponse.value) { $DetectedApps.Add($app) }
-
-        Write-LogMessage -API 'CIPPDBCache' -tenant $TenantFilter -message "DetectedApps total count: $TotalCount, first page: $($DetectedApps.Count)" -sev Debug
-
-        # Step 2: If more pages exist, pre-calculate all skip offsets and fire as batches
-        if ($FirstResponse.'@odata.nextLink' -and $TotalCount -gt 50) {
-            $SkipRequests = [System.Collections.Generic.List[PSCustomObject]]::new()
-            for ($skip = 50; $skip -lt $TotalCount; $skip += 50) {
-                $SkipRequests.Add([PSCustomObject]@{
-                    id     = "detectedApps-$skip"
-                    method = 'GET'
-                    url    = "deviceManagement/detectedApps?`$skip=$skip"
-                })
-            }
-            Write-LogMessage -API 'CIPPDBCache' -tenant $TenantFilter -message "Fetching $($SkipRequests.Count) remaining pages in bulk" -sev Debug
-
-            # New-GraphBulkRequest auto-batches into groups of 20, NoPaginateIds prevents chasing empty nextLinks
-            $SkipResults = New-GraphBulkRequest -Requests @($SkipRequests) -tenantid $TenantFilter -NoPaginateIds @($SkipRequests.id)
-
-            foreach ($Result in $SkipResults) {
-                if ($Result.status -eq 200 -and $Result.body.value) {
-                    foreach ($app in $Result.body.value) { $DetectedApps.Add($app) }
-                }
-            }
-        }
-
-        Write-LogMessage -API 'CIPPDBCache' -tenant $TenantFilter -message "Retrieved $($DetectedApps.Count) detected apps (expected $TotalCount)" -sev Debug
-
-        if ($DetectedApps.Count -eq 0) {
+        if (($DetectedApps | Measure-Object).Count -eq 0) {
+            Write-LogMessage -API 'CIPPDBCache' -tenant $TenantFilter -message 'No detected apps found' -sev Debug
             Add-CIPPDbItem -TenantFilter $TenantFilter -Type 'DetectedApps' -Data @()
             Add-CIPPDbItem -TenantFilter $TenantFilter -Type 'DetectedApps' -Data @() -Count
             return
         }
 
-        # Step 3: Bulk fetch managed devices for each app (unchanged from original)
-        $DeviceRequests = $DetectedApps | Where-Object { $_.id } | ForEach-Object {
-            [PSCustomObject]@{
-                id     = $_.id
-                method = 'GET'
-                url    = "deviceManagement/detectedApps('$($_.id)')/managedDevices"
+        # Build bulk request for devices that have each detected app
+        $DeviceRequests = $DetectedApps | ForEach-Object {
+            if ($_.id) {
+                [PSCustomObject]@{
+                    id     = $_.id
+                    method = 'GET'
+                    url    = "deviceManagement/detectedApps('$($_.id)')/managedDevices"
+                }
             }
         }
 
@@ -81,7 +48,11 @@ function Set-CIPPDBCacheDetectedApps {
             # Add devices to each detected app object
             $DetectedAppsWithDevices = foreach ($App in $DetectedApps) {
                 $Devices = Get-GraphBulkResultByID -Results $DeviceResults -ID $App.id -Value
-                $App | Add-Member -NotePropertyName 'managedDevices' -NotePropertyValue ($Devices ?? @()) -Force
+                if ($Devices) {
+                    $App | Add-Member -NotePropertyName 'managedDevices' -NotePropertyValue $Devices -Force
+                } else {
+                    $App | Add-Member -NotePropertyName 'managedDevices' -NotePropertyValue @() -Force
+                }
                 $App
             }
 

@@ -57,7 +57,7 @@ Write-Host "Total settings fetched: $($allSettings.Count)" -ForegroundColor Gree
 
 # ---------------------------------------------------------------------------
 # Transform to the shape expected by CIPP
-# Shape: [{ id, displayName, description, helpText, infoUrls, options: [{id, displayName, description, helpText}] | null }]
+# Shape: [{ id, displayName, options: [{id, displayName, description}] | null }]
 # ---------------------------------------------------------------------------
 Write-Host 'Transforming data...' -ForegroundColor Yellow
 
@@ -69,7 +69,6 @@ $collection = $allSettings | Sort-Object -Property id | ForEach-Object {
                 id          = $_.PSObject.Properties['itemId']?.Value
                 displayName = $_.PSObject.Properties['displayName']?.Value
                 description = $_.PSObject.Properties['description']?.Value
-                helpText    = $_.PSObject.Properties['helpText']?.Value
             }
         }
     } else {
@@ -79,9 +78,6 @@ $collection = $allSettings | Sort-Object -Property id | ForEach-Object {
     [PSCustomObject]@{
         id          = $_.id
         displayName = $_.displayName
-        description = $_.description
-        helpText    = $_.helpText
-        infoUrls    = $_.infoUrls
         options     = $options
     }
 }
@@ -91,10 +87,10 @@ $collection = $allSettings | Sort-Object -Property id | ForEach-Object {
 # ---------------------------------------------------------------------------
 Set-Location $PSScriptRoot
 
-$json = $collection | ConvertTo-Json -Depth 5 -Compress
+$json = $collection | ConvertTo-Json -Depth 5
 
 # CIPP-API root (used by Compare-CIPPIntuneObject.ps1 at runtime)
-$apiPath = Join-Path $PSScriptRoot '..\Config\intuneCollection.json'
+$apiPath = Join-Path $PSScriptRoot '..\intuneCollection.json'
 $json | Set-Content -Path $apiPath -Encoding utf8NoBOM
 Write-Host "Written: $(Resolve-Path $apiPath)" -ForegroundColor Green
 

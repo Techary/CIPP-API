@@ -73,7 +73,6 @@ function Invoke-ListTenantAlignment {
                         standardName         = $ResolvedName
                         complianceStatus     = $_.ComplianceStatus
                         compliant            = $_.Compliant
-                        deviationStatus      = $_.DeviationStatus
                         licenseAvailable     = $_.LicenseAvailable
                         currentValue         = $_.CurrentValue
                         expectedValue        = $_.ExpectedValue
@@ -92,7 +91,6 @@ function Invoke-ListTenantAlignment {
                     alignmentScore           = $_.AlignmentScore
                     LicenseMissingPercentage = $_.LicenseMissingPercentage
                     combinedAlignmentScore   = $_.CombinedScore
-                    currentDeviationsCount   = $_.CurrentDeviationsCount
                     latestDataCollection     = $_.LatestDataCollection
                 }
             }

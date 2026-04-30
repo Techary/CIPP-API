@@ -17,7 +17,7 @@ function Invoke-CippTestZTNA21825 {
         }
 
         # Get Conditional Access policies
-        $CAPolicies = Get-CIPPTestData -TenantFilter $Tenant -Type 'ConditionalAccessPolicies'
+        $CAPolicies = New-CIPPDbRequest -TenantFilter $Tenant -Type 'ConditionalAccessPolicies'
 
         # Filter to policies targeting roles
         $RoleScopedPolicies = $CAPolicies | Where-Object {

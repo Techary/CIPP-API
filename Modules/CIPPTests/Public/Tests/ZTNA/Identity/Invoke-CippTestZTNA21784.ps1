@@ -6,7 +6,7 @@ function Invoke-CippTestZTNA21784 {
     param($Tenant)
     #tested
     try {
-        $CAPolicies = Get-CIPPTestData -TenantFilter $Tenant -Type 'ConditionalAccessPolicies'
+        $CAPolicies = New-CIPPDbRequest -TenantFilter $Tenant -Type 'ConditionalAccessPolicies'
 
         if (-not $CAPolicies) {
             Add-CippTestResult -TenantFilter $Tenant -TestId 'ZTNA21784' -TestType 'Identity' -Status 'Skipped' -ResultMarkdown 'No data found in database. This may be due to missing required licenses or data collection not yet completed.' -Risk 'Medium' -Name 'All user sign in activity uses phishing-resistant authentication methods' -UserImpact 'Low' -ImplementationEffort 'Medium' -Category 'Access Control'
@@ -14,7 +14,7 @@ function Invoke-CippTestZTNA21784 {
         }
 
         # Get authentication strength policies from cache
-        $AuthStrengthPolicies = Get-CIPPTestData -TenantFilter $Tenant -Type 'AuthenticationStrengths'
+        $AuthStrengthPolicies = New-CIPPDbRequest -TenantFilter $Tenant -Type 'AuthenticationStrengths'
 
         # Define phishing-resistant methods
         $PhishingResistantMethods = @(
