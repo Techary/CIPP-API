@@ -15,7 +15,9 @@ function Invoke-ExecSetSPOSiteAuthContext {
     $TenantFilter = $Request.Body.tenantFilter ?? $Request.Query.tenantFilter
     $SiteUrl = $Request.Body.siteUrl ?? $Request.Query.siteUrl
     $ConditionalAccessPolicy = $Request.Body.conditionalAccessPolicy.value ?? $Request.Body.conditionalAccessPolicy ?? $Request.Query.conditionalAccessPolicy
-    $AuthenticationContextName = $Request.Body.authenticationContextName.label ?? $Request.Body.authenticationContextName.value ?? $Request.Body.authenticationContextName ?? $Request.Query.authenticationContextName
+    # Prefer .value (the raw displayName) over .label (the formatted "c1: name" display string).
+    # The autocomplete sends both; the SPO API needs the exact displayName, not the prefixed label.
+    $AuthenticationContextName = $Request.Body.authenticationContextName.value ?? $Request.Body.authenticationContextName.label ?? $Request.Body.authenticationContextName ?? $Request.Query.authenticationContextName
 
     $ValidPolicies = @('AllowFullAccess', 'AllowLimitedAccess', 'BlockAccess', 'AuthenticationContext')
     if (-not $TenantFilter -or -not $SiteUrl -or -not $ConditionalAccessPolicy) {
