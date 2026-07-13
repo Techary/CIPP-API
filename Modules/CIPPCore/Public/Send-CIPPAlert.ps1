@@ -17,6 +17,7 @@ function Send-CIPPAlert {
         $TableName,
         $RowKey = [string][guid]::NewGuid(),
         $Attachments,
+        $AffectedUser,
         [switch]$UseStandardizedSchema
     )
     Write-Information 'Shipping Alert'
@@ -128,7 +129,7 @@ function Send-CIPPAlert {
                 return (Get-CIPPAzDataTableEntity @DevSecretsTable -Filter "PartitionKey eq '$SecretName' and RowKey eq '$SecretName'").APIKey
             }
 
-            $KeyVaultName = ($env:WEBSITE_DEPLOYMENT_ID -split '-')[0]
+            $KeyVaultName = Get-CippKeyVaultName
             return (Get-CippKeyVaultSecret -VaultName $KeyVaultName -Name $SecretName -AsPlainText)
         }
 
@@ -343,6 +344,20 @@ function Send-CIPPAlert {
                     Write-Information "Could not send alerts to ticketing system: $($ErrorMessage.NormalizedError)"
                     Write-LogMessage -API 'Webhook Alerts' -tenant $TenantFilter -message "Could not send alerts to ticketing system: $($ErrorMessage.NormalizedError)" -sev Error -LogData $ErrorMessage
                 }
+                if ($AffectedUser) {
+                    $Alert.AffectedUser = $AffectedUser
+                    $UserLabel = if ($AffectedUser.UPN) { $AffectedUser.UPN } elseif ($AffectedUser.AzureOID) { "OID:$($AffectedUser.AzureOID)" } else { 'unknown' }
+                    Write-Information "PSA alert AffectedUser: $UserLabel"
+                }
+                $PsaResult = New-CippExtAlert -Alert $Alert
+                if ($PsaResult) {
+                    Write-Information "PSA result: $PsaResult"
+                }
+                Write-LogMessage -API 'Webhook Alerts' -tenant $TenantFilter -message "Sent PSA alert $title" -sev info
+            } catch {
+                $ErrorMessage = Get-CippException -Exception $_
+                Write-Information "Could not send alerts to ticketing system: $($ErrorMessage.NormalizedError)"
+                Write-LogMessage -API 'Webhook Alerts' -tenant $TenantFilter -message "Could not send alerts to ticketing system: $($ErrorMessage.NormalizedError)" -sev Error -LogData $ErrorMessage
             }
         }
     }
