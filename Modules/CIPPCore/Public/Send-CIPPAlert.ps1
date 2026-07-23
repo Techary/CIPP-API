@@ -9,7 +9,6 @@ function Send-CIPPAlert {
         $TenantFilter,
         $altEmail,
         $altWebhook,
-        $PSATicketId,
         $APIName = 'Send Alert',
         $SchemaSource,
         $InvokingCommand,
@@ -328,21 +327,16 @@ function Send-CIPPAlert {
 
     if ($Type -eq 'psa') {
         Write-Information 'Trying to send to PSA'
-        if ($config.sendtoIntegration) {
-            if ($PSCmdlet.ShouldProcess('PSA', 'Sending alert')) {
-                try {
-                    $Alert = @{
-                        TenantId   = $TenantFilter
-                        AlertText  = "$HTMLContent"
-                        AlertTitle = "$($Title)"
-                        TicketId   = $PSATicketId
-                    }
-                    New-CippExtAlert -Alert $Alert
-                    Write-LogMessage -API 'Webhook Alerts' -tenant $TenantFilter -message "Sent PSA alert $title" -sev info
-                } catch {
-                    $ErrorMessage = Get-CippException -Exception $_
-                    Write-Information "Could not send alerts to ticketing system: $($ErrorMessage.NormalizedError)"
-                    Write-LogMessage -API 'Webhook Alerts' -tenant $TenantFilter -message "Could not send alerts to ticketing system: $($ErrorMessage.NormalizedError)" -sev Error -LogData $ErrorMessage
+        if (-not $config.sendtoIntegration) {
+            Write-Information 'PSA delivery skipped: sendtoIntegration is disabled in CippNotifications config. Enable it under Settings -> Notifications to route alerts to your PSA.'
+            return
+        }
+        if ($PSCmdlet.ShouldProcess('PSA', 'Sending alert')) {
+            try {
+                $Alert = @{
+                    TenantId   = $TenantFilter
+                    AlertText  = "$HTMLContent"
+                    AlertTitle = "$($Title)"
                 }
                 if ($AffectedUser) {
                     $Alert.AffectedUser = $AffectedUser

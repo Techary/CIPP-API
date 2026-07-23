@@ -6,74 +6,12 @@ function New-HaloPSATicket {
     $client,
     [string]$UserUPN,
     [string]$AzureOID,
-    [string]$DisplayName,
-    $TicketId
+    [string]$DisplayName
   )
-
-  # Load Halo configuration
+  #Get HaloPSA Token based on the config we have.
   $Table = Get-CIPPTable -TableName Extensionsconfig
   $Configuration = ((Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json).HaloPSA
   $TicketTable = Get-CIPPTable -TableName 'PSATickets'
-  $Token = Get-HaloToken -configuration $Configuration
-
-  # Helper to add a note to an existing ticket
-  function Add-HaloTicketNote {
-    param ($TicketId, $Html)
-
-    $Object = [PSCustomObject]@{
-      ticket_id      = $TicketId
-      outcome_id     = 7
-      hiddenfromuser = $true
-      note_html      = $Html
-    }
-
-    if ($Configuration.Outcome) {
-      $Object.outcome_id = $Configuration.Outcome.value ?? $Configuration.Outcome
-    }
-
-    $Body = ConvertTo-Json -Compress -Depth 10 -InputObject @($Object)
-
-    if ($PSCmdlet.ShouldProcess("HaloPSA Ticket $TicketId", 'Add note')) {
-      Invoke-RestMethod `
-        -Uri "$($Configuration.ResourceURL)/actions" `
-        -ContentType 'application/json; charset=utf-8' `
-        -Method Post `
-        -Body $Body `
-        -Headers @{ Authorization = "Bearer $($Token.access_token)" }
-    }
-  }
-
-  if ($TicketId) {
-    Write-Information "Explicit PSA Ticket ID provided: $TicketId"
-
-    try {
-      $Ticket = Invoke-RestMethod `
-        -Uri "$($Configuration.ResourceURL)/Tickets/$TicketId?includedetails=true&includelastaction=false" `
-        -ContentType 'application/json; charset=utf-8' `
-        -Method Get `
-        -Headers @{ Authorization = "Bearer $($Token.access_token)" } `
-        -SkipHttpErrorCheck
-
-      if ($Ticket.id -and -not $Ticket.hasbeenclosed) {
-        Write-Information "Ticket $TicketId is open. Appending note."
-        Add-HaloTicketNote -TicketId $TicketId -Html $Description
-        return "Note added to HaloPSA ticket $TicketId"
-      }
-
-      Write-Information "Ticket $TicketId is closed or not found. Creating new ticket."
-    }
-    catch {
-      $Message = $_.Exception.Message
-      Write-LogMessage `
-        -API 'HaloPSATicket' `
-        -sev Error `
-        -message "Failed to update HaloPSA ticket $($TicketId): $Message" `
-        -LogData (Get-CippException -Exception $_)
-      return "Failed to update HaloPSA ticket $($TicketId): $Message"
-    }
-  }
-
-  $TitleHash = Get-StringHash -String $Title
   $token = Get-HaloToken -configuration $Configuration
 
   # Resolve affected user to a HaloPSA contact when the integration is configured for it.
@@ -100,25 +38,10 @@ function New-HaloPSATicket {
   $SiteId = if ($MatchedUser) { $MatchedUser.site_id } else { $null }
 
   if ($Configuration.ConsolidateTickets) {
-    $ExistingTicket = Get-CIPPAzDataTableEntity `
-      @TicketTable `
-      -Filter "PartitionKey eq 'HaloPSA' and RowKey eq '$($Client)-$($TitleHash)'"
-
+    $ExistingTicket = Get-CIPPAzDataTableEntity @TicketTable -Filter "PartitionKey eq 'HaloPSA' and RowKey eq '$($client)-$($TitleHash)'"
     if ($ExistingTicket) {
-      Write-Information "Consolidated ticket found: $($ExistingTicket.TicketID)"
+      Write-Information "Ticket already exists in HaloPSA: $($ExistingTicket.TicketID)"
 
-      try {
-        $Ticket = Invoke-RestMethod `
-          -Uri "$($Configuration.ResourceURL)/Tickets/$($ExistingTicket.TicketID)?includedetails=true&includelastaction=false" `
-          -ContentType 'application/json; charset=utf-8' `
-          -Method Get `
-          -Headers @{ Authorization = "Bearer $($Token.access_token)" } `
-          -SkipHttpErrorCheck
-
-        if ($Ticket.id -and -not $Ticket.hasbeenclosed) {
-          Write-Information "Consolidated ticket open. Appending note."
-          Add-HaloTicketNote -TicketId $ExistingTicket.TicketID -Html $Description
-          return "Note added to HaloPSA ticket $($ExistingTicket.TicketID)"
       $Ticket = Invoke-RestMethod -Uri "$($Configuration.ResourceURL)/Tickets/$($ExistingTicket.TicketID)?includedetails=true&includelastaction=false&nocache=undefined&includeusersassets=false&isdetailscreen=true" -ContentType 'application/json; charset=utf-8' -Method Get -Headers @{Authorization = "Bearer $($token.access_token)" } -SkipHttpErrorCheck
       if ($Ticket.id) {
         if (!$Ticket.hasbeenclosed) {
@@ -129,12 +52,12 @@ function New-HaloPSATicket {
             hiddenfromuser = $true
             note_html      = $description
           }
-
+  
           if ($Configuration.Outcome) {
             $Outcome = $Configuration.Outcome.value ?? $Configuration.Outcome
             $Object.outcome_id = $Outcome
           }
-
+  
           $body = ConvertTo-Json -Compress -Depth 10 -InputObject @($Object)
           $NoteAdded = $false
           try {
@@ -162,11 +85,9 @@ function New-HaloPSATicket {
             return "Note added to ticket in HaloPSA: $($ExistingTicket.TicketID)"
           }
         }
-
-        Write-Information "Consolidated ticket closed. Creating new ticket."
       }
-      catch {
-        Write-Information "Failed to read consolidated ticket. Creating new ticket."
+      else {
+        Write-Information 'Existing ticket could not be found. Creating a new ticket instead.'
       }
     }
   }
@@ -195,8 +116,8 @@ function New-HaloPSATicket {
     site_id                    = $SiteId
     user_name                  = $UserNameValue
     reportedby                 = $null
-    summary                    = $Title
-    details_html               = $Description
+    summary                    = $title
+    details_html               = $description
     donotapplytemplateintheapi = $true
     attachments                = @()
     _novalidate                = $true
@@ -204,46 +125,42 @@ function New-HaloPSATicket {
 
   if ($Configuration.TicketType) {
     $TicketType = $Configuration.TicketType.value ?? $Configuration.TicketType
-    $Object | Add-Member -MemberType NoteProperty -Name 'tickettype_id' -Value $TicketType -Force
+    $object | Add-Member -MemberType NoteProperty -Name 'tickettype_id' -Value $TicketType -Force
   }
+  #use the token to create a new ticket in HaloPSA
+  $body = ConvertTo-Json -Compress -Depth 10 -InputObject @($Object)
 
-  $Body = ConvertTo-Json -Compress -Depth 10 -InputObject @($Object)
-
-  Write-Information 'Creating new HaloPSA ticket'
-
+  Write-Information 'Sending ticket to HaloPSA'
+  Write-Information $body
   try {
-    if ($PSCmdlet.ShouldProcess('HaloPSA', 'Create ticket')) {
-      $Ticket = Invoke-RestMethod `
-        -Uri "$($Configuration.ResourceURL)/Tickets" `
-        -ContentType 'application/json; charset=utf-8' `
-        -Method Post `
-        -Body $Body `
-        -Headers @{ Authorization = "Bearer $($Token.access_token)" }
-
+    if ($PSCmdlet.ShouldProcess('Send ticket to HaloPSA', 'Create ticket')) {
+      $Ticket = Invoke-RestMethod -Uri "$($Configuration.ResourceURL)/Tickets" -ContentType 'application/json; charset=utf-8' -Method Post -Body $body -Headers @{Authorization = "Bearer $($token.access_token)" }
       Write-Information "Ticket created in HaloPSA: $($Ticket.id)"
 
       if ($Configuration.ConsolidateTickets) {
         $TicketObject = [PSCustomObject]@{
           PartitionKey = 'HaloPSA'
-          RowKey       = "$($Client)-$($TitleHash)"
-          Title        = $Title
-          ClientId     = $Client
+          RowKey       = "$($client)-$($TitleHash)"
+          Title        = $title
+          ClientId     = $client
           TicketID     = $Ticket.id
         }
         Add-CIPPAzDataTableEntity @TicketTable -Entity $TicketObject -Force
         Write-Information 'Ticket added to consolidation table'
       }
-
       return "Ticket created in HaloPSA: $($Ticket.id)"
     }
   }
   catch {
-    $Message = $_.Exception.Message
-    Write-LogMessage `
-      -API 'HaloPSATicket' `
-      -sev Error `
-      -message "Failed to create HaloPSA ticket: $Message" `
-      -LogData (Get-CippException -Exception $_)
-    return "Failed to create HaloPSA ticket: $Message"
+    $Message = if ($_.ErrorDetails.Message) {
+      Get-NormalizedError -Message $_.ErrorDetails.Message
+    }
+    else {
+      $_.Exception.message
+    }
+    Write-LogMessage -message "Failed to send ticket to HaloPSA: $Message" -API 'HaloPSATicket' -sev Error -LogData (Get-CippException -Exception $_)
+    Write-Information "Failed to send ticket to HaloPSA: $Message"
+    Write-Information "Body we tried to ship: $body"
+    return "Failed to send ticket to HaloPSA: $Message"
   }
 }
